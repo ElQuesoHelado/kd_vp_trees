@@ -25,8 +25,7 @@ void VP_tree::init_distances(std::string &dist_path) {
         rapidcsv::LabelParams(-1, -1),
         rapidcsv::SeparatorParams(),
         rapidcsv::ConverterParams(),
-        rapidcsv::LineReaderParams(true, '#', true) // El último 'true' es para skipEmptyLines
-    );
+        rapidcsv::LineReaderParams(true, '#', true));
 
     auto nrows = csv_file.GetRowCount(), ncols = csv_file.GetColumnCount();
 
@@ -64,26 +63,29 @@ void VP_tree::build() {
 std::unique_ptr<VP_tree::Node> VP_tree::_build(std::vector<int> &objs, size_t i, size_t j) {
   if (i >= j)
     return {};
-  // if (i == j)
-  //   return std::make_unique<VP_tree::Node>(objs[i], 0, nullptr, nullptr);
+
+  if (i + 1 == j)
+    return std::make_unique<VP_tree::Node>(objs[i], 0, nullptr, nullptr);
 
   std::uniform_int_distribution<> dist(i, j - 1);
 
   auto piv = dist(eng);
 
+  std::swap(objs[piv], objs[j - 1]);
+
+  piv = j - 1;
+
   double median{};
   for (size_t k{i}; k < j - 1; ++k) {
-    median += VP_tree::dist(piv, k);
+    median += VP_tree::dist(objs[piv], objs[k]);
   }
 
-  median /= ((double)j - (double)i + 1.f);
-
-  std::swap(objs[piv], objs[j - 1]);
+  median /= ((double)j - (double)i - 1.f);
 
   int b_piv = (int)i - 1;
 
   for (int p = i; p < j - 1; p++) {
-    if (VP_tree::dist(piv, p) < median) {
+    if (VP_tree::dist(objs[j - 1], objs[p]) < median) {
       b_piv++;
       std::swap(objs[p], objs[b_piv]);
     }
@@ -92,7 +94,8 @@ std::unique_ptr<VP_tree::Node> VP_tree::_build(std::vector<int> &objs, size_t i,
   b_piv++;
   std::swap(objs[j - 1], objs[b_piv]);
 
-  return std::make_unique<VP_tree::Node>(piv, median,
+  return std::make_unique<VP_tree::Node>(objs[b_piv],
+                                         median,
                                          _build(objs, i, b_piv),
                                          _build(objs, b_piv + 1, j));
 }
@@ -120,13 +123,15 @@ void VP_tree::print_tree(Node *node) {
   if (!node)
     return;
 
-  std::println("{} ", node->id);
+  std::print("{} median: {} ", node->id, node->median);
   if (!node->near && !node->far)
     std::print("(l) ");
 
-  std::print("Near: ");
+  std::println();
+
+  // std::print("Near: ");
   print_tree(node->near.get());
-  std::print("Far: ");
+  // std::print("Far: ");
   print_tree(node->far.get());
 }
 

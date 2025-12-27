@@ -15,9 +15,9 @@ class VP_tree {
 
   struct Node {
     size_t id{};
-    size_t median{};
+    double median{};
     std::unique_ptr<Node> near{}, far{};
-    Node(size_t id, size_t median, std::unique_ptr<Node> &&near, std::unique_ptr<Node> &&far)
+    Node(size_t id, double median, std::unique_ptr<Node> &&near, std::unique_ptr<Node> &&far)
         : id(id), median(median), near(std::move(near)), far(std::move(far)) {};
   };
 
