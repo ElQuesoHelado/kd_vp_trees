@@ -1,5 +1,6 @@
 #include "vp_tree.hpp"
 #include "rapidcsv.h"
+#include <algorithm>
 #include <cstddef>
 #include <exception>
 #include <memory>
@@ -70,34 +71,24 @@ std::unique_ptr<VP_tree::Node> VP_tree::_build(std::vector<int> &objs, size_t i,
   std::uniform_int_distribution<> dist(i, j - 1);
 
   auto piv = dist(eng);
-
   std::swap(objs[piv], objs[j - 1]);
 
-  piv = j - 1;
+  auto piv_obj = objs[j - 1];
+  size_t median = (j + i - 1) / 2;
 
-  double median{};
-  for (size_t k{i}; k < j - 1; ++k) {
-    median += VP_tree::dist(objs[piv], objs[k]);
-  }
+  std::nth_element(objs.begin() + i, objs.begin() + median, objs.begin() + j - 1,
+                   [&](int a, int b) { return VP_tree::dist(a, piv_obj) <
+                                              VP_tree::dist(b, piv_obj); });
 
-  median /= ((double)j - (double)i - 1.f);
+  auto distance = VP_tree::dist(piv_obj, objs[median]);
 
-  int b_piv = (int)i - 1;
+  // Aparentemente la posicion del pivot se puede ignorar/descarta
+  // std::swap(objs[piv], objs[median]);
 
-  for (int p = i; p < j - 1; p++) {
-    if (VP_tree::dist(objs[j - 1], objs[p]) < median) {
-      b_piv++;
-      std::swap(objs[p], objs[b_piv]);
-    }
-  }
-
-  b_piv++;
-  std::swap(objs[j - 1], objs[b_piv]);
-
-  return std::make_unique<VP_tree::Node>(objs[b_piv],
-                                         median,
-                                         _build(objs, i, b_piv),
-                                         _build(objs, b_piv + 1, j));
+  return std::make_unique<VP_tree::Node>(piv_obj,
+                                         distance,
+                                         _build(objs, i, median),
+                                         _build(objs, median, j - 1));
 }
 
 bool VP_tree::puntal_search(size_t id) {
@@ -129,12 +120,14 @@ void VP_tree::print_tree(Node *node) {
 
   std::println();
 
-  // std::print("Near: ");
   print_tree(node->near.get());
-  // std::print("Far: ");
   print_tree(node->far.get());
 }
 
 void VP_tree::print_tree() {
   print_tree(root.get());
+}
+
+std::vector<int> VP_tree::knn(size_t id) {
+  return {};
 }

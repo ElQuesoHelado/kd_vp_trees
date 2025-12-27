@@ -30,12 +30,15 @@ class VP_tree {
   void init_distances(std::string &dist_path);
 
   std::unique_ptr<Node> _build(std::vector<int> &objs, size_t i, size_t j);
+  std::vector<int> _knn(size_t id);
+  void print_tree(Node *node);
 
 public:
   void build();
   bool puntal_search(size_t id);
 
-  void print_tree(Node *node);
+  std::vector<int> knn(size_t id);
+
   void print_tree();
 
   VP_tree(std::string dist_path) {

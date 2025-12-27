@@ -15,12 +15,12 @@
 #include "vp_tree.hpp"
 
 int main(int argc, char *argv[]) {
-  VP_tree vp_tree("distances1.csv");
+  VP_tree vp_tree("distances.csv");
 
   vp_tree.build();
 
-  // std::println("{}", vp_tree.puntal_search(600));
-  vp_tree.print_tree();
+  std::println("{}", vp_tree.puntal_search(600));
+  // vp_tree.print_tree();
 
   return 0;
 }
