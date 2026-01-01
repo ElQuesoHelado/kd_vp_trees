@@ -3,9 +3,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <exception>
+#include <functional>
+#include <limits>
 #include <memory>
 #include <numeric>
 #include <print>
+#include <queue>
 
 inline size_t idx(size_t i, size_t j) {
   if (i > j)
@@ -128,6 +131,47 @@ void VP_tree::print_tree() {
   print_tree(root.get());
 }
 
-std::vector<int> VP_tree::knn(size_t id) {
-  return {};
+void VP_tree::_radial_search(Node *node, size_t id, double r, std::vector<int> &objs) {
+  if (!node)
+    return;
+
+  if (dist(node->id, id) <= r)
+    objs.push_back(node->id);
+
+  if (dist(node->id, id) <= node->median + r)
+    _radial_search(node->near.get(), id, r, objs);
+  else
+    _radial_search(node->far.get(), id, r, objs);
+}
+
+std::vector<int> VP_tree::radial_search(size_t id, double r) {
+  std::vector<int> objs{};
+  _radial_search(root.get(), id, r, objs);
+
+  return objs;
+}
+
+void VP_tree::_knn(Node *node, size_t id, double r, NodeMaxHeap &heap, size_t n) {
+  if (!node)
+    return;
+
+  // if (dist(node->id, id) <= r)
+  //   objs.push_back(node->id);
+  //
+  // if (dist(node->id, id) <= node->median + r)
+  //   _radial_search(node->near.get(), id, r, objs);
+  // else
+  //   _radial_search(node->far.get(), id, r, objs);
+  //
+  // return;
+}
+
+std::vector<int> VP_tree::knn(size_t id, size_t n) {
+  NodeMaxHeap heap;
+  auto u = std::numeric_limits<double>::max();
+
+  _knn(root.get(), id, u, heap, n);
+
+  std::vector<int> objs{};
+  return objs;
 }

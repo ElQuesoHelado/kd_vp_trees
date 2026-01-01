@@ -12,6 +12,7 @@
 #include <opencv2/imgproc.hpp> // Gaussian Blur
 #include <opencv2/videoio.hpp>
 
+#include "visual.hpp"
 #include "vp_tree.hpp"
 
 int main(int argc, char *argv[]) {
@@ -19,8 +20,15 @@ int main(int argc, char *argv[]) {
 
   vp_tree.build();
 
-  std::println("{}", vp_tree.puntal_search(600));
+  // std::println("{}", vp_tree.puntal_search(600));
   // vp_tree.print_tree();
+
+  // std::println("{}", vp_tree.radial_search(200, 5));
+  //
+  // auto objs = vp_tree.radial_search(200, 5);
+  auto objs = vp_tree.knn(560, 6);
+
+  visual::show_neighbors(200, objs);
 
   return 0;
 }
