@@ -163,15 +163,14 @@ void VP_tree::_knn(VPNode *node, size_t ref_id, double &u, NodeMaxHeap &heap, si
     u = heap.top().d;
   }
 
+  // TODO: Alguna optim. de cual se realiza primero
   if (d <= node->r + u) {
     _knn(node->near.get(), ref_id, u, heap, n);
   }
 
-  if (d > node->r + u) {
+  if (d > node->r - u) { // Por desig. triang
     _knn(node->far.get(), ref_id, u, heap, n);
   }
-
-  return;
 }
 
 std::vector<int> VP_tree::knn(size_t ref_id, size_t n) {
