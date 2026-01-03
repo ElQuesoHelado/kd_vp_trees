@@ -3,12 +3,10 @@
 #include <algorithm>
 #include <cstddef>
 #include <exception>
-#include <functional>
 #include <limits>
 #include <memory>
 #include <numeric>
 #include <print>
-#include <queue>
 
 inline size_t idx(size_t i, size_t j) {
   if (i > j)
@@ -64,12 +62,12 @@ void VP_tree::build() {
   root = _build(objs, 0, nobjs);
 }
 
-std::unique_ptr<VP_tree::Node> VP_tree::_build(std::vector<int> &objs, size_t i, size_t j) {
+std::unique_ptr<VPNode> VP_tree::_build(std::vector<int> &objs, size_t i, size_t j) {
   if (i >= j)
     return {};
 
   if (i + 1 == j)
-    return std::make_unique<VP_tree::Node>(objs[i], 0, nullptr, nullptr);
+    return std::make_unique<VPNode>(objs[i], 0, nullptr, nullptr);
 
   std::uniform_int_distribution<> dist(i, j - 1);
 
@@ -88,23 +86,23 @@ std::unique_ptr<VP_tree::Node> VP_tree::_build(std::vector<int> &objs, size_t i,
   // Aparentemente la posicion del pivot se puede ignorar/descarta
   // std::swap(objs[piv], objs[median]);
 
-  return std::make_unique<VP_tree::Node>(piv_obj,
-                                         distance,
-                                         _build(objs, i, median),
-                                         _build(objs, median, j - 1));
+  return std::make_unique<VPNode>(piv_obj,
+                                  distance,
+                                  _build(objs, i, median),
+                                  _build(objs, median, j - 1));
 }
 
 bool VP_tree::puntal_search(size_t id) {
   if (id > nobjs)
     return false;
 
-  Node *node = root.get();
+  VPNode *node = root.get();
   while (node) {
     std::println("{}", node->id);
     if (node->id == id)
       return true;
 
-    if (dist(id, node->id) < node->median)
+    if (dist(id, node->id) < node->r)
       node = node->near.get();
     else
       node = node->far.get();
@@ -113,11 +111,11 @@ bool VP_tree::puntal_search(size_t id) {
   return false;
 }
 
-void VP_tree::print_tree(Node *node) {
+void VP_tree::print_tree(VPNode *node) {
   if (!node)
     return;
 
-  std::print("{} median: {} ", node->id, node->median);
+  std::print("{} median: {} ", node->id, node->r);
   if (!node->near && !node->far)
     std::print("(l) ");
 
@@ -131,14 +129,14 @@ void VP_tree::print_tree() {
   print_tree(root.get());
 }
 
-void VP_tree::_radial_search(Node *node, size_t id, double r, std::vector<int> &objs) {
+void VP_tree::_radial_search(VPNode *node, size_t id, double r, std::vector<int> &objs) {
   if (!node)
     return;
 
   if (dist(node->id, id) <= r)
     objs.push_back(node->id);
 
-  if (dist(node->id, id) <= node->median + r)
+  if (dist(node->id, id) <= node->r + r)
     _radial_search(node->near.get(), id, r, objs);
   else
     _radial_search(node->far.get(), id, r, objs);
@@ -151,27 +149,44 @@ std::vector<int> VP_tree::radial_search(size_t id, double r) {
   return objs;
 }
 
-void VP_tree::_knn(Node *node, size_t id, double r, NodeMaxHeap &heap, size_t n) {
+void VP_tree::_knn(VPNode *node, size_t ref_id, double &u, NodeMaxHeap &heap, size_t n) {
   if (!node)
     return;
 
-  // if (dist(node->id, id) <= r)
-  //   objs.push_back(node->id);
-  //
-  // if (dist(node->id, id) <= node->median + r)
-  //   _radial_search(node->near.get(), id, r, objs);
-  // else
-  //   _radial_search(node->far.get(), id, r, objs);
-  //
-  // return;
+  auto d = dist(node->id, ref_id);
+
+  if (d < u) {
+    if (heap.size() == n)
+      heap.pop();
+    heap.push({node->id, d});
+
+    u = heap.top().d;
+  }
+
+  if (d <= node->r + u) {
+    _knn(node->near.get(), ref_id, u, heap, n);
+  }
+
+  if (d > node->r + u) {
+    _knn(node->far.get(), ref_id, u, heap, n);
+  }
+
+  return;
 }
 
-std::vector<int> VP_tree::knn(size_t id, size_t n) {
+std::vector<int> VP_tree::knn(size_t ref_id, size_t n) {
   NodeMaxHeap heap;
   auto u = std::numeric_limits<double>::max();
 
-  _knn(root.get(), id, u, heap, n);
+  _knn(root.get(), ref_id, u, heap, n);
 
-  std::vector<int> objs{};
+  std::vector<int> objs;
+  objs.reserve(n);
+
+  while (!heap.empty()) {
+    objs.push_back(heap.top().id);
+    heap.pop();
+  }
+
   return objs;
 }

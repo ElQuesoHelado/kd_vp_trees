@@ -1,5 +1,6 @@
 #pragma once
 
+#include "vp_defs.hpp"
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -15,34 +16,26 @@ class VP_tree {
   std::random_device rd;
   std::mt19937 eng{rd()};
 
-  struct Node {
-    size_t id{};
-    double median{};
-    std::unique_ptr<Node> near{}, far{};
-    Node(size_t id, double median, std::unique_ptr<Node> &&near, std::unique_ptr<Node> &&far)
-        : id(id), median(median), near(std::move(near)), far(std::move(far)) {};
-  };
+  inline double dist(size_t i, size_t j);
 
-  typedef std::priority_queue<std::reference_wrapper<Node>, std::vector<std::reference_wrapper<Node>>,
-                              decltype([](const Node &lhs, const Node &rhs) {
-                                return lhs.median <= rhs.median;
+  typedef std::priority_queue<VPNeig, std::vector<VPNeig>,
+                              decltype([](const VPNeig &lhs, const VPNeig &rhs) {
+                                return lhs.d <= rhs.d;
                               })>
       NodeMaxHeap;
 
   size_t nobjs{};
   std::vector<double> distances;
-  std::unique_ptr<Node> root;
-
-  inline double dist(size_t i, size_t j);
+  std::unique_ptr<VPNode> root;
 
   void init_distances(std::string &dist_path);
 
-  std::unique_ptr<Node> _build(std::vector<int> &objs, size_t i, size_t j);
-  void print_tree(Node *node);
+  std::unique_ptr<VPNode> _build(std::vector<int> &objs, size_t i, size_t j);
+  void print_tree(VPNode *node);
 
-  void _radial_search(Node *node, size_t id, double r, std::vector<int> &objs);
+  void _radial_search(VPNode *node, size_t id, double r, std::vector<int> &objs);
 
-  void _knn(Node *node, size_t id, double u, NodeMaxHeap &heap, size_t n);
+  void _knn(VPNode *node, size_t id, double &u, NodeMaxHeap &heap, size_t n);
 
 public:
   void build();
