@@ -1,3 +1,6 @@
 out/
 .cache
 compile_commands.json
+configuracion_experimentos.txt
+resultados_*.csv
+resumen_estadistico.txt

@@ -69,19 +69,19 @@ std::unique_ptr<VPNode> VP_tree::_build(std::vector<int> &objs, size_t i, size_t
   if (i + 1 == j)
     return std::make_unique<VPNode>(objs[i], 0, nullptr, nullptr);
 
-  std::uniform_int_distribution<> dist(i, j - 1);
+  std::uniform_int_distribution<> int_dist(i, j - 1);
 
-  auto piv = dist(eng);
+  auto piv = int_dist(eng);
   std::swap(objs[piv], objs[j - 1]);
 
   auto piv_obj = objs[j - 1];
   size_t median = (j + i - 1) / 2;
 
   std::nth_element(objs.begin() + i, objs.begin() + median, objs.begin() + j - 1,
-                   [&](int a, int b) { return VP_tree::dist(a, piv_obj) <
-                                              VP_tree::dist(b, piv_obj); });
+                   [&](int a, int b) { return dist(a, piv_obj) <
+                                              dist(b, piv_obj); });
 
-  auto distance = VP_tree::dist(piv_obj, objs[median]);
+  auto distance = dist(piv_obj, objs[median]);
 
   // Aparentemente la posicion del pivot se puede ignorar/descarta
   // std::swap(objs[piv], objs[median]);

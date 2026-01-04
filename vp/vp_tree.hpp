@@ -4,8 +4,6 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
-#include <opencv2/core/mat.hpp>
-#include <opencv2/imgproc.hpp>
 #include <queue>
 #include <random>
 #include <string>
