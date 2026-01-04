@@ -1,6 +1,7 @@
 #include "vp_tree.hpp"
 #include "rapidcsv.h"
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <exception>
 #include <limits>
@@ -8,49 +9,60 @@
 #include <numeric>
 #include <print>
 
-inline size_t idx(size_t i, size_t j) {
-  if (i > j)
-    std::swap(i, j);
-  return j * (j + 1) / 2 + i;
-}
+// inline size_t idx(size_t i, size_t j) {
+//   if (i > j)
+//     std::swap(i, j);
+//   return j * (j + 1) / 2 + i;
+// }
 
-inline double VP_tree::dist(size_t i, size_t j) {
-  return distances[idx(i, j)];
-}
+// inline double VP_tree::ssim_dist(size_t i, size_t j) {
+//   return distances[idx(i, j)];
+// }
 
-void VP_tree::init_distances(std::string &dist_path) {
-  std::println("Cargando distancias");
-
-  try {
-    rapidcsv::Document csv_file(
-        dist_path,
-        rapidcsv::LabelParams(-1, -1),
-        rapidcsv::SeparatorParams(),
-        rapidcsv::ConverterParams(),
-        rapidcsv::LineReaderParams(true, '#', true));
-
-    auto nrows = csv_file.GetRowCount(), ncols = csv_file.GetColumnCount();
-
-    if (nrows == 0 || nrows != ncols)
-      return;
-
-    distances.resize(nrows * (nrows + 1) / 2);
-
-    for (size_t i{0}; i < nrows; ++i) {
-      auto row = csv_file.GetRow<double>(i);
-      for (size_t j{i}; j < ncols; ++j) {
-        distances[idx(i, j)] = row[j];
-      }
-    }
-
-    nobjs = nrows;
-
-  } catch (std::exception &e) {
-    std::println("Exception: {}", e.what());
+inline double VP_tree::euclidsq_dist(size_t i, size_t j) const {
+  auto &a = feat_vecs[i],
+       &b = feat_vecs[j];
+  double sum = 0.0;
+  for (size_t k = 0; k < a.size(); k++) {
+    double diff = a[k] - b[k];
+    sum += diff * diff;
   }
-
-  std::println("Distancias cargadas");
+  return std::sqrt(sum);
 }
+
+// void VP_tree::init_distances(std::string &dist_path) {
+//   std::println("Cargando distancias");
+//
+//   try {
+//     rapidcsv::Document csv_file(
+//         dist_path,
+//         rapidcsv::LabelParams(-1, -1),
+//         rapidcsv::SeparatorParams(),
+//         rapidcsv::ConverterParams(),
+//         rapidcsv::LineReaderParams(true, '#', true));
+//
+//     auto nrows = csv_file.GetRowCount(), ncols = csv_file.GetColumnCount();
+//
+//     if (nrows == 0 || nrows != ncols)
+//       return;
+//
+//     distances.resize(nrows * (nrows + 1) / 2);
+//
+//     for (size_t i{0}; i < nrows; ++i) {
+//       auto row = csv_file.GetRow<double>(i);
+//       for (size_t j{i}; j < ncols; ++j) {
+//         distances[idx(i, j)] = row[j];
+//       }
+//     }
+//
+//     nobjs = nrows;
+//
+//   } catch (std::exception &e) {
+//     std::println("Exception: {}", e.what());
+//   }
+//
+//   std::println("Distancias cargadas");
+// }
 
 void VP_tree::build() {
   std::println("Construyendo arbol");
@@ -62,7 +74,8 @@ void VP_tree::build() {
   root = _build(objs, 0, nobjs);
 }
 
-std::unique_ptr<VPNode> VP_tree::_build(std::vector<int> &objs, size_t i, size_t j) {
+std::unique_ptr<VPNode> VP_tree::_build(std::vector<int> &objs,
+                                        size_t i, size_t j) {
   if (i >= j)
     return {};
 
@@ -78,10 +91,10 @@ std::unique_ptr<VPNode> VP_tree::_build(std::vector<int> &objs, size_t i, size_t
   size_t median = (j + i - 1) / 2;
 
   std::nth_element(objs.begin() + i, objs.begin() + median, objs.begin() + j - 1,
-                   [&](int a, int b) { return dist(a, piv_obj) <
-                                              dist(b, piv_obj); });
+                   [&](int a, int b) { return euclidsq_dist(a, piv_obj) <
+                                              euclidsq_dist(b, piv_obj); });
 
-  auto distance = dist(piv_obj, objs[median]);
+  auto distance = euclidsq_dist(piv_obj, objs[median]);
 
   // Aparentemente la posicion del pivot se puede ignorar/descarta
   // std::swap(objs[piv], objs[median]);
@@ -102,7 +115,7 @@ bool VP_tree::puntal_search(size_t id) {
     if (node->id == id)
       return true;
 
-    if (dist(id, node->id) < node->r)
+    if (euclidsq_dist(id, node->id) < node->r)
       node = node->near.get();
     else
       node = node->far.get();
@@ -133,10 +146,10 @@ void VP_tree::_radial_search(VPNode *node, size_t id, double r, std::vector<int>
   if (!node)
     return;
 
-  if (dist(node->id, id) <= r)
+  if (euclidsq_dist(node->id, id) <= r)
     objs.push_back(node->id);
 
-  if (dist(node->id, id) <= node->r + r)
+  if (euclidsq_dist(node->id, id) <= node->r + r)
     _radial_search(node->near.get(), id, r, objs);
   else
     _radial_search(node->far.get(), id, r, objs);
@@ -153,7 +166,7 @@ void VP_tree::_knn(VPNode *node, size_t ref_id, double &u, NodeMaxHeap &heap, si
   if (!node)
     return;
 
-  auto d = dist(node->id, ref_id);
+  auto d = euclidsq_dist(node->id, ref_id);
 
   if (d < u) {
     if (heap.size() == n)
@@ -163,13 +176,14 @@ void VP_tree::_knn(VPNode *node, size_t ref_id, double &u, NodeMaxHeap &heap, si
     u = heap.top().d;
   }
 
-  // TODO: Alguna optim. de cual se realiza primero
-  if (d <= node->r + u) {
+  if (d < node->r) {
     _knn(node->near.get(), ref_id, u, heap, n);
-  }
-
-  if (d > node->r - u) { // Por desig. triang
+    if (d + u >= node->r)
+      _knn(node->far.get(), ref_id, u, heap, n);
+  } else {
     _knn(node->far.get(), ref_id, u, heap, n);
+    if (d - u <= node->r)
+      _knn(node->near.get(), ref_id, u, heap, n);
   }
 }
 
@@ -183,7 +197,7 @@ std::vector<int> VP_tree::knn(size_t ref_id, size_t n) {
   objs.reserve(n);
 
   while (!heap.empty()) {
-    objs.push_back(heap.top().id);
+    objs.push_back(heap.top().id + 1);
     heap.pop();
   }
 
