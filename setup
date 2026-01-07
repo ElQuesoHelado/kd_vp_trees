@@ -1,0 +1,22 @@
+#! /usr/bin/bash
+
+set -e
+
+VENV_DIR="venv"
+PYTHON_BIN="python3"
+
+if [ ! -d "$VENV_DIR" ]; then
+  echo "[*] Creando entorno virtual"
+  $PYTHON_BIN -m venv $VENV_DIR
+fi
+
+echo "[*] Iniciando entorno virtual..."
+source $VENV_DIR/bin/activate
+
+echo "[*] Actualizando pip..."
+pip install --upgrade pip
+
+if [ -f "requirements.txt" ]; then
+  echo "[*] Instalando dependencias..."
+  pip install -r requirements.txt
+fi
