@@ -131,14 +131,14 @@ private:
   }
 
 public:
-  double buildTimeMs;
-  double totalInsertionTimeMs;
-  double totalSearchTimeMs;
+  double buildTimeUs;
+  double totalInsertionTimeUs;
+  double totalSearchTimeUs;
   size_t estimatedMemoryBytes;
 
   KDTree()
-      : root(nullptr), dimensions(0), treeSize(0), buildTimeMs(0),
-        totalInsertionTimeMs(0), totalSearchTimeMs(0), estimatedMemoryBytes(0) {
+      : root(nullptr), dimensions(0), treeSize(0), buildTimeUs(0),
+        totalInsertionTimeUs(0), totalSearchTimeUs(0), estimatedMemoryBytes(0) {
   }
 
   void build(vector<Point> &points) {
@@ -153,7 +153,7 @@ public:
     root = buildTree(points, 0, 0, points.size());
 
     auto end = high_resolution_clock::now();
-    buildTimeMs = duration_cast<microseconds>(end - start).count() / 1000.0;
+    buildTimeUs = duration_cast<nanoseconds>(end - start).count();
 
     estimatedMemoryBytes =
         treeSize * (sizeof(KDNode) + dimensions * sizeof(double));
@@ -170,8 +170,8 @@ public:
 
     auto end = high_resolution_clock::now();
     double insertionTime =
-        duration_cast<microseconds>(end - start).count() / 1000.0;
-    totalInsertionTimeMs += insertionTime;
+        duration_cast<nanoseconds>(end - start).count();
+    totalInsertionTimeUs += insertionTime;
   }
 
   Point nearestNeighbor(const Point &target, double &searchTime) {
@@ -183,8 +183,8 @@ public:
     nearestNeighbor(root.get(), target, best, bestDist);
 
     auto end = high_resolution_clock::now();
-    searchTime = duration_cast<microseconds>(end - start).count() / 1000.0;
-    totalSearchTimeMs += searchTime;
+    searchTime = duration_cast<nanoseconds>(end - start).count();
+    totalSearchTimeUs += searchTime;
 
     return best ? best->point : Point();
   }
@@ -205,8 +205,8 @@ public:
     reverse(result.begin(), result.end());
 
     auto end = high_resolution_clock::now();
-    searchTime = duration_cast<microseconds>(end - start).count() / 1000.0;
-    totalSearchTimeMs += searchTime;
+    searchTime = duration_cast<nanoseconds>(end - start).count();
+    totalSearchTimeUs += searchTime;
 
     return result;
   }
@@ -220,66 +220,12 @@ public:
     return depth / idealDepth;
   }
 
-  double getBuildTime() const { return buildTimeMs; }
-  double getTotalInsertionTime() const { return totalInsertionTimeMs; }
+  double getBuildTime() const { return buildTimeUs; }
+  double getTotalInsertionTime() const { return totalInsertionTimeUs; }
   double getAverageInsertionTime() const {
-    return treeSize > 0 ? totalInsertionTimeMs / treeSize : 0.0;
+    return treeSize > 0 ? totalInsertionTimeUs / treeSize : 0.0;
   }
 
   int size() const { return treeSize; }
   int getDimensions() const { return dimensions; }
 };
-
-inline vector<Point> readCSV(const string &filename, int maxRows = -1,
-                             int numFeatures = -1) {
-  ifstream file(filename);
-  vector<Point> points;
-  string line;
-  int rowCount = 0;
-
-  if (!file.is_open()) {
-    cerr << "Error: No se pudo abrir el archivo " << filename << endl;
-    return points;
-  }
-
-  while (getline(file, line) && (maxRows == -1 || rowCount < maxRows)) {
-    stringstream ss(line);
-    string value;
-
-    if (!getline(ss, value, ','))
-      continue;
-
-    int id;
-    try {
-      id = stoi(value);
-    } catch (...) {
-      cerr << "Error al leer ID: " << value << endl;
-      continue;
-    }
-
-    vector<double> coords;
-    int featureCount = 0;
-
-    while (getline(ss, value, ',')) {
-      if (numFeatures != -1 && featureCount >= numFeatures)
-        break;
-
-      try {
-        coords.push_back(stod(value));
-        featureCount++;
-      } catch (...) {
-        cerr << "Error al convertir valor: " << value << endl;
-        coords.push_back(0.0);
-        featureCount++;
-      }
-    }
-
-    if (!coords.empty()) {
-      points.emplace_back(coords, id);
-      rowCount++;
-    }
-  }
-
-  file.close();
-  return points;
-}

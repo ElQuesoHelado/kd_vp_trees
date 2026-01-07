@@ -10,4 +10,4 @@ add_executable(vp_tree_stats
     main.cpp
 )
 
-target_link_libraries(vp_tree_stats vp_tree_lib)
+target_link_libraries(vp_tree_stats PRIVATE vp_tree_lib)

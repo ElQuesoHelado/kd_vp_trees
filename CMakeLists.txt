@@ -9,3 +9,9 @@ add_subdirectory(common)
 add_subdirectory(kd)
 add_subdirectory(vp)
 add_subdirectory(comp)
+
+file(COPY
+    media
+    dataset
+    DESTINATION ${CMAKE_BINARY_DIR}
+)

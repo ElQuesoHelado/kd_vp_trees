@@ -17,8 +17,35 @@
 #include "visual.hpp"
 #include "vp_tree.hpp"
 
-int main(int argc, char *argv[]) {
-  vector<Point> baseData = readCSV("dataset/images_dataset.csv", 20000, -1);
+#include "funcs.hpp"
+
+void wait_until_close(const std::vector<std::string> &windows) {
+  bool initialized = false;
+
+  while (true) {
+    int key = cv::waitKey(30);
+    if (key == 27)
+      break; // ESC
+
+    bool any_alive = false;
+
+    for (const auto &w : windows) {
+      double v = cv::getWindowProperty(w, cv::WND_PROP_VISIBLE);
+
+      if (v >= 1) {
+        any_alive = true;
+        initialized = true;
+        break;
+      }
+    }
+
+    if (initialized && !any_alive)
+      break;
+  }
+}
+
+int main() {
+  auto baseData = readCSV("dataset/images_dataset.csv", 20000, -1);
 
   VP_tree vp_tree(baseData);
   vp_tree.build();
@@ -26,28 +53,48 @@ int main(int argc, char *argv[]) {
   KDTree kd_tree;
   kd_tree.build(baseData);
 
-  int id = 1100, n = 10;
+  while (true) {
+    int id, k;
 
-  auto e = std::find_if(baseData.begin(), baseData.end(),
-                        [&](auto &p) { return p.id == id; });
+    std::cout << "\nID de imagen (-1 para salir): ";
+    std::cin >> id;
+    if (id < 0)
+      break;
 
-  double searchTime;
-  auto raw_res_kd = kd_tree.kNearestNeighbors({e->coords,
-                                               e->id},
-                                              n, searchTime);
+    std::cout << "k vecinos: ";
+    std::cin >> k;
 
-  auto res_vp = vp_tree.knn(id - 1, n);
+    auto it = std::find_if(baseData.begin(), baseData.end(),
+                           [&](auto &p) { return p.id == id; });
 
-  std::vector<int> res_kd;
-  for (auto &e : raw_res_kd)
-    res_kd.push_back(e.id);
+    if (it == baseData.end()) {
+      std::cout << "ID no encontrado\n";
+      continue;
+    }
 
-  std::println("{}", res_kd);
-  std::println("{}", res_vp);
+    double searchTime;
+    auto raw_kd = kd_tree.kNearestNeighbors({it->coords, it->id},
+                                            k, searchTime);
 
-  visual::show_neighbors(id, res_kd);
+    auto res_vp = vp_tree.knn(id, k);
 
-  visual::show_neighbors(id, res_vp);
+    std::vector<int> res_kd;
+    for (auto &e : raw_kd)
+      res_kd.push_back(e.id);
+
+    std::vector<std::string> windows;
+
+    windows.push_back("KD-tree");
+    visual::show_neighbors(id, res_kd, 0, "KD-tree");
+
+    windows.push_back("VP-tree");
+    visual::show_neighbors(id, res_vp, 1, "VP-tree");
+
+    std::cout << "ESC o cerrar ventanas para continuar...\n";
+    wait_until_close(windows);
+
+    cv::destroyAllWindows();
+  }
 
   return 0;
 }

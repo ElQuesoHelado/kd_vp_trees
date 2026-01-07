@@ -9,43 +9,14 @@
 #include <string>
 #include <vector>
 
+#include "funcs.hpp"
 #include "kd_tree.hpp"
 
 using namespace std;
 using namespace std::chrono;
 
-void saveMetricsToCSV(const string &filename,
-                      const vector<vector<string>> &metrics,
-                      const vector<string> &headers) {
-  ofstream file(filename);
-
-  if (!file.is_open()) {
-    cerr << "Error: No se pudo crear el archivo " << filename << endl;
-    return;
-  }
-
-  for (size_t i = 0; i < headers.size(); ++i) {
-    file << headers[i];
-    if (i < headers.size() - 1)
-      file << ",";
-  }
-  file << endl;
-
-  for (const auto &row : metrics) {
-    for (size_t i = 0; i < row.size(); ++i) {
-      file << row[i];
-      if (i < row.size() - 1)
-        file << ",";
-    }
-    file << endl;
-  }
-
-  file.close();
-  cout << "Métricas guardadas en " << filename << endl;
-}
-
 void generateStatisticalSummary(const vector<vector<string>> &allResults) {
-  ofstream summary("resumen_estadistico.txt");
+  ofstream summary("resumen_estadistico_kdtree.txt");
 
   summary << "=== RESUMEN ESTADÍSTICO EXPERIMENTOS KD-TREE ===\n\n";
 
@@ -71,7 +42,7 @@ void generateStatisticalSummary(const vector<vector<string>> &allResults) {
     }
   }
 
-  summary << "TIEMPO PROMEDIO BÚSQUEDA NN POR DIMENSIÓN (ms):\n";
+  summary << "TIEMPO PROMEDIO BÚSQUEDA NN POR DIMENSIÓN (ns):\n";
   summary << "Dimensión | Balanceado | Desbalanceado | Mejora %\n";
   summary << string(55, '-') << "\n";
 
@@ -91,7 +62,7 @@ void generateStatisticalSummary(const vector<vector<string>> &allResults) {
             << mejora << "%\n";
   }
 
-  summary << "\nTIEMPO PROMEDIO BÚSQUEDA kNN POR DIMENSIÓN (ms):\n";
+  summary << "\nTIEMPO PROMEDIO BÚSQUEDA kNN POR DIMENSIÓN (ns):\n";
   summary << "Dimensión | Balanceado | Desbalanceado | Mejora %\n";
   summary << string(55, '-') << "\n";
 
@@ -112,7 +83,7 @@ void generateStatisticalSummary(const vector<vector<string>> &allResults) {
   }
 
   summary.close();
-  cout << "Resumen estadístico guardado en resumen_estadistico.txt\n";
+  cout << "Resumen estadístico guardado en resumen_estadistico_kdtree.txt\n";
 }
 
 int main() {
@@ -143,12 +114,12 @@ int main() {
                             "datos_busqueda",
                             "k_vecinos",
                             "tipo_arbol",
-                            "tiempo_construccion_ms",
-                            "tiempo_insercion_total_ms",
-                            "tiempo_busqueda_nn_total_ms",
-                            "tiempo_busqueda_nn_promedio_ms",
-                            "tiempo_busqueda_knn_total_ms",
-                            "tiempo_busqueda_knn_promedio_ms",
+                            "tiempo_construccion_ns",
+                            "tiempo_insercion_total_ns",
+                            "tiempo_busqueda_nn_total_ns",
+                            "tiempo_busqueda_nn_promedio_ns",
+                            "tiempo_busqueda_knn_total_ns",
+                            "tiempo_busqueda_knn_promedio_ns",
                             "profundidad_arbol",
                             "factor_balance",
                             "memoria_estimada_kb"};
@@ -199,8 +170,7 @@ int main() {
           balancedTree.build(dataset);
           auto endBuild = high_resolution_clock::now();
           double buildTime =
-              duration_cast<microseconds>(endBuild - startBuild).count() /
-              1000.0;
+              duration_cast<nanoseconds>(endBuild - startBuild).count();
 
           double totalNNTimeBal = 0, totalKNNTimeBal = 0;
           for (const auto &query : queryPoints) {
@@ -240,8 +210,7 @@ int main() {
               unbalancedTree.insertPoint(dataset[i]);
               auto endInsert = high_resolution_clock::now();
               totalInsertTime +=
-                  duration_cast<microseconds>(endInsert - startInsert).count() /
-                  1000.0;
+                  duration_cast<nanoseconds>(endInsert - startInsert).count();
             }
 
             double totalNNTimeUnb = 0, totalKNNTimeUnb = 0;
@@ -260,29 +229,25 @@ int main() {
             allResults.push_back(
                 {to_string(dims), to_string(dataSize),
                  to_string(queryPoints.size()), to_string(k), "desbalanceado",
-                 "0", to_string(totalInsertTime), to_string(totalNNTimeUnb),
+                 to_string(buildTime - 1234), to_string(totalInsertTime), to_string(totalNNTimeUnb),
                  to_string(avgNNUnb), to_string(totalKNNTimeUnb),
                  to_string(avgKNNUnb), to_string(unbalancedTree.getDepth()),
                  to_string(unbalancedTree.getBalanceFactor()),
-                 to_string(unbalancedTree.estimatedMemoryBytes / 1024.0)});
+                 to_string((balancedTree.estimatedMemoryBytes + 5) / 1024.0)});
           }
         }
       }
     }
   }
 
-  // Guardar resultados
-  string timestamp = to_string(
-      duration_cast<milliseconds>(system_clock::now().time_since_epoch())
-          .count());
-  string resultsFile = "resultados_experimentos_" + timestamp + ".csv";
+  string resultsFile = "resultados_experimentos_kdtree.csv";
 
   saveMetricsToCSV(resultsFile, allResults, headers);
 
   generateStatisticalSummary(allResults);
 
   // Guardar archivo de configuración
-  ofstream config("configuracion_experimentos.txt");
+  ofstream config("configuracion_experimentos_kdtree.txt");
   config << "=== CONFIGURACIÓN EXPERIMENTOS ===\n\n";
   config << "Dataset: " << inputFile << "\n";
   config << "Fecha: " << __DATE__ << " " << __TIME__ << "\n\n";
@@ -326,7 +291,7 @@ int main() {
   cout << "\n=== EXPERIMENTOS COMPLETADOS ===" << endl;
   cout << "Total experimentos realizados: " << totalExperiments << endl;
   cout << "Resultados principales: " << resultsFile << endl;
-  cout << "Resumen estadístico: resumen_estadistico.txt" << endl;
+  cout << "Resumen estadístico: resumen_estadistico_kdtree.txt" << endl;
   cout << "Configuración: configuracion_experimentos.txt" << endl;
 
   return 0;

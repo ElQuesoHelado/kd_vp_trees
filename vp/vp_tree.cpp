@@ -1,5 +1,6 @@
 #include "vp_tree.hpp"
 #include "rapidcsv.h"
+#include "vp_defs.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -65,13 +66,10 @@ inline double VP_tree::euclidsq_dist(size_t i, size_t j) const {
 // }
 
 void VP_tree::build() {
-  std::println("Construyendo arbol");
+  root = _build(points, 0, nobjs);
 
-  std::vector<int> objs(nobjs);
-
-  std::iota(objs.begin(), objs.end(), 0);
-
-  root = _build(objs, 0, nobjs);
+  estimatedMemoryBytes =
+      nobjs * (sizeof(VPNode) + 2 * sizeof(std::unique_ptr<VPNode>));
 }
 
 std::unique_ptr<VPNode> VP_tree::_build(std::vector<int> &objs,
@@ -95,6 +93,8 @@ std::unique_ptr<VPNode> VP_tree::_build(std::vector<int> &objs,
                                               euclidsq_dist(b, piv_obj); });
 
   auto distance = euclidsq_dist(piv_obj, objs[median]);
+
+  metrics.radius_sum += distance;
 
   // Aparentemente la posicion del pivot se puede ignorar/descarta
   // std::swap(objs[piv], objs[median]);
@@ -142,6 +142,49 @@ void VP_tree::print_tree() {
   print_tree(root.get());
 }
 
+void VP_tree::reset_metrics() {
+  metrics = {};
+}
+
+void VP_tree::reset_search_metrics() {
+  metrics.lastVisitedNodes = 0;
+  // metrics.totalDistanceCalls
+}
+
+double VP_tree::get_last_prunning_rate() {
+  if (nobjs == 0)
+    return 0;
+  double nodesNotVisited = nobjs - metrics.lastVisitedNodes;
+  return nodesNotVisited / nobjs;
+}
+
+size_t VP_tree::get_last_visited_nodes() {
+  return metrics.lastVisitedNodes;
+}
+
+size_t VP_tree::get_total_distance_calls() {
+  return metrics.totalDistanceCalls;
+}
+
+double VP_tree::get_average_partition_radius() {
+  if (nobjs == 0)
+    return 0;
+
+  return static_cast<double>(metrics.radius_sum) / nobjs;
+}
+
+size_t VP_tree::get_depth() const {
+  return get_depth(root.get());
+}
+
+size_t VP_tree::get_depth(VPNode *node) const {
+  if (!node)
+    return 0;
+
+  return 1 + std::max(get_depth(node->near.get()),
+                      get_depth(node->far.get()));
+}
+
 void VP_tree::_radial_search(VPNode *node, size_t id, double r, std::vector<int> &objs) {
   if (!node)
     return;
@@ -165,6 +208,10 @@ std::vector<int> VP_tree::radial_search(size_t id, double r) {
 void VP_tree::_knn(VPNode *node, size_t ref_id, double &u, NodeMaxHeap &heap, size_t n) {
   if (!node)
     return;
+
+  metrics.lastVisitedNodes++;
+  metrics.totalNodesVisited++;
+  metrics.totalDistanceCalls++;
 
   auto d = euclidsq_dist(node->id, ref_id);
 
@@ -197,9 +244,46 @@ std::vector<int> VP_tree::knn(size_t ref_id, size_t n) {
   objs.reserve(n);
 
   while (!heap.empty()) {
-    objs.push_back(heap.top().id + 1);
+    objs.push_back(heap.top().id);
     heap.pop();
   }
 
   return objs;
+}
+
+int VP_tree::nn(size_t ref_id) {
+  size_t best_id = ref_id;
+  double best_dist = std::numeric_limits<double>::max();
+
+  _nn(root.get(), ref_id, best_id, best_dist);
+  return best_id;
+}
+
+void VP_tree::_nn(VPNode *node, size_t ref_id,
+                  size_t &best_id, double &best_dist) {
+  if (!node)
+    return;
+
+  metrics.lastVisitedNodes++;
+  metrics.totalNodesVisited++;
+  metrics.totalDistanceCalls++;
+
+  double d = euclidsq_dist(node->id, ref_id);
+
+  if (d < best_dist) {
+    best_dist = d;
+    best_id = node->id;
+  }
+
+  double r = node->r;
+
+  if (d < r) {
+    _nn(node->near.get(), ref_id, best_id, best_dist);
+    if (d + best_dist >= r)
+      _nn(node->far.get(), ref_id, best_id, best_dist);
+  } else {
+    _nn(node->far.get(), ref_id, best_id, best_dist);
+    if (d - best_dist <= r)
+      _nn(node->near.get(), ref_id, best_id, best_dist);
+  }
 }
